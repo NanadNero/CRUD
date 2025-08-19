@@ -1,40 +1,35 @@
 import { useState } from 'react';
 
-interface User {
-  id?: string;
-  firstName: string;
-  lastName: string;
-  address: string;
-  IdentityNumber: number;
-  birthDate: string;
-  status: boolean;
+interface Event {
+  id?: number;
+  title: string;
+  description: string;
+  date: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-interface AddUserFormProps {
-  onSave: (user: User) => void;
+interface AddEventFormProps {
+  onSave: (event: Event) => Promise<void>;
   onCancel: () => void;
 }
 
-const AddUserForm: React.FC<AddUserFormProps> = ({ onSave, onCancel }) => {
-  const [formData, setFormData] = useState<User>({
-    firstName: '',
-    lastName: '',
-    address: '',
-    IdentityNumber: 0,
-    birthDate: '',
-    status: true
+const AddEventForm: React.FC<AddEventFormProps> = ({ onSave, onCancel }) => {
+  const [formData, setFormData] = useState<Event>({
+    title: '',
+    description: '',
+    date: ''
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
     
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked :
-              type === 'number' ? Number(value) : value
+      [name]: value
     }));
 
     if (errors[name]) {
@@ -48,35 +43,27 @@ const AddUserForm: React.FC<AddUserFormProps> = ({ onSave, onCancel }) => {
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
 
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = 'Nama depan harus diisi';
+    if (!formData.title.trim()) {
+      newErrors.title = 'Judul event harus diisi';
+    } else if (formData.title.trim().length < 3) {
+      newErrors.title = 'Judul event minimal 3 karakter';
     }
 
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = 'Nama belakang harus diisi';
+    if (!formData.description.trim()) {
+      newErrors.description = 'Deskripsi event harus diisi';
+    } else if (formData.description.trim().length < 10) {
+      newErrors.description = 'Deskripsi event minimal 10 karakter';
     }
 
-    if (!formData.address.trim()) {
-      newErrors.address = 'Alamat harus diisi';
-    }
-
-    if (!formData.IdentityNumber || formData.IdentityNumber <= 0) {
-      newErrors.IdentityNumber = 'Nomor identitas harus diisi dengan angka positif';
-    }
-
-    if (!formData.birthDate) {
-      newErrors.birthDate = 'Tanggal lahir harus diisi';
+    if (!formData.date) {
+      newErrors.date = 'Tanggal event harus diisi';
     } else {
-      const birthDate = new Date(formData.birthDate);
+      const eventDate = new Date(formData.date);
       const today = new Date();
-      const age = today.getFullYear() - birthDate.getFullYear();
+      today.setHours(0, 0, 0, 0); 
       
-      if (age < 17) {
-        newErrors.birthDate = 'Umur minimal 17 tahun';
-      }
-      
-      if (birthDate > today) {
-        newErrors.birthDate = 'Tanggal lahir tidak boleh di masa depan';
+      if (eventDate < today) {
+        newErrors.date = 'Tanggal event tidak boleh di masa lalu';
       }
     }
 
@@ -96,8 +83,8 @@ const AddUserForm: React.FC<AddUserFormProps> = ({ onSave, onCancel }) => {
     try {
       await onSave(formData);
     } catch (error) {
-      console.error('Error saving user:', error);
-      alert('Terjadi kesalahan saat menyimpan data user');
+      console.error('Error saving event:', error);
+      alert('Terjadi kesalahan saat menyimpan data event');
     } finally {
       setIsSubmitting(false);
     }
@@ -106,14 +93,15 @@ const AddUserForm: React.FC<AddUserFormProps> = ({ onSave, onCancel }) => {
   // Reset form
   const handleReset = () => {
     setFormData({
-      firstName: '',
-      lastName: '',
-      address: '',
-      IdentityNumber: 0,
-      birthDate: '',
-      status: true
+      title: '',
+      description: '',
+      date: ''
     });
     setErrors({});
+  };
+
+  const getTodayDate = () => {
+    return new Date().toISOString().split('T')[0];
   };
 
   return (
@@ -122,155 +110,92 @@ const AddUserForm: React.FC<AddUserFormProps> = ({ onSave, onCancel }) => {
         {/* Header */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-800">Tambah User Baru</h1>
+            <h1 className="text-3xl font-bold text-gray-800">Tambah Event Baru</h1>
             <button
               onClick={onCancel}
               className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
-              title="Kembali ke daftar user"
+              title="Kembali ke daftar event"
             >
               ×
             </button>
           </div>
-          <p className="text-gray-600 mt-2">Silakan isi form di bawah untuk menambahkan user baru</p>
+          <p className="text-gray-600 mt-2">Silakan isi form di bawah untuk menambahkan event baru</p>
         </div>
 
-        {}
+        {/* Form */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {}
+            {/* Title */}
             <div>
-              <label htmlFor="firstName" className="block text-sm font-semibold text-gray-700 mb-2">
-                Namamu <span className="text-red-500">*</span>
+              <label htmlFor="title" className="block text-sm font-semibold text-gray-700 mb-2">
+                Judul Event <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                id="firstName"
-                name="firstName"
-                value={formData.firstName}
+                id="title"
+                name="title"
+                value={formData.title}
                 onChange={handleInputChange}
-                placeholder="Masukkan nama depan"
+                placeholder="Masukkan judul event..."
                 className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                  errors.firstName ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  errors.title ? 'border-red-500 bg-red-50' : 'border-gray-300'
                 }`}
               />
-              {errors.firstName && (
-                <p className="mt-1 text-sm text-red-600">{errors.firstName}</p>
+              {errors.title && (
+                <p className="mt-1 text-sm text-red-600">{errors.title}</p>
               )}
             </div>
 
-            {}
+            {/* Description */}
             <div>
-              <label htmlFor="lastName" className="block text-sm font-semibold text-gray-700 mb-2">
-                Nama Bapakmu <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="lastName"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleInputChange}
-                placeholder="Masukkan nama belakang"
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                  errors.lastName ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                }`}
-              />
-              {errors.lastName && (
-                <p className="mt-1 text-sm text-red-600">{errors.lastName}</p>
-              )}
-            </div>
-
-            {}
-            <div>
-              <label htmlFor="address" className="block text-sm font-semibold text-gray-700 mb-2">
-                Alamat Rumahmu (Tagih pinjol sekalian)<span className="text-red-500">*</span>
+              <label htmlFor="description" className="block text-sm font-semibold text-gray-700 mb-2">
+                Deskripsi Event <span className="text-red-500">*</span>
               </label>
               <textarea
-                id="address"
-                name="address"
-                value={formData.address}
+                id="description"
+                name="description"
+                value={formData.description}
                 onChange={handleInputChange}
-                placeholder="Masukkan alamat lengkap..."
-                rows={4}
+                placeholder="Jelaskan tentang event ini..."
+                rows={6}
                 className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-vertical ${
-                  errors.address ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  errors.description ? 'border-red-500 bg-red-50' : 'border-gray-300'
                 }`}
               />
-              {errors.address && (
-                <p className="mt-1 text-sm text-red-600">{errors.address}</p>
+              {errors.description && (
+                <p className="mt-1 text-sm text-red-600">{errors.description}</p>
               )}
             </div>
 
-            {}
+            {/* Date */}
             <div>
-              <label htmlFor="IdentityNumber" className="block text-sm font-semibold text-gray-700 mb-2">
-                Nomor HP kamu😋 (Random aj pls) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                id="IdentityNumber"
-                name="IdentityNumber"
-                value={formData.IdentityNumber || ''}
-                onChange={handleInputChange}
-                placeholder="Contoh: 123456"
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                  errors.IdentityNumber ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                }`}
-                min="1"
-              />
-              {errors.IdentityNumber && (
-                <p className="mt-1 text-sm text-red-600">{errors.IdentityNumber}</p>
-              )}
-            </div>
-
-            {}
-            <div>
-              <label htmlFor="birthDate" className="block text-sm font-semibold text-gray-700 mb-2">
-                Tanggal Pinjol kamu🤬<span className="text-red-500">*</span>
+              <label htmlFor="date" className="block text-sm font-semibold text-gray-700 mb-2">
+                Tanggal Event <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
-                id="birthDate"
-                name="birthDate"
-                value={formData.birthDate}
+                id="date"
+                name="date"
+                value={formData.date}
                 onChange={handleInputChange}
+                min={getTodayDate()}
                 className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                  errors.birthDate ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  errors.date ? 'border-red-500 bg-red-50' : 'border-gray-300'
                 }`}
-                max={new Date().toISOString().split('T')[0]}
               />
-              {errors.birthDate && (
-                <p className="mt-1 text-sm text-red-600">{errors.birthDate}</p>
+              {errors.date && (
+                <p className="mt-1 text-sm text-red-600">{errors.date}</p>
               )}
             </div>
 
-            {}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Status
-              </label>
-              <div className="flex items-center space-x-3">
-                <input
-                  type="checkbox"
-                  id="status"
-                  name="status"
-                  checked={formData.status}
-                  onChange={handleInputChange}
-                  className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label htmlFor="status" className="text-sm text-gray-700">
-                  User aktif (dapat menggunakan sistem)
-                </label>
-              </div>
-            </div>
-
-            {}
+            {/* Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t">
               <button
                 type="submit"
                 disabled={isSubmitting}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-black px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? 'Menyimpan...' : 'Simpan User'}
+                {isSubmitting ? 'Menyimpan...' : 'Simpan Event'}
               </button>
               
               <button
@@ -296,16 +221,18 @@ const AddUserForm: React.FC<AddUserFormProps> = ({ onSave, onCancel }) => {
         <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
           <h3 className="font-semibold text-blue-800 mb-2">Petunjuk Pengisian:</h3>
           <ul className="text-sm text-blue-700 space-y-1">
-            <li>• Semua field yang bertanda (*) wajib diisi. Kalo gk, nanti dijual di darkweb</li>
-            <li>• Nomor identitas harus berupa angka positif. Angka romawi juga nanti di jual sama admin</li>
-            <li>• Umur minimal 17 tahun. Kalau bocil nanti kita jual ginjalnya di darkweb juga</li>
-            <li>• Pastikan alamat diisi dengan lengkap. Kalo nggak, nanti kaki mu kita jual di darkweb</li>
+            <li>• Semua field yang bertanda (*) wajib diisi</li>
+            <li>• Judul event minimal 3 karakter</li>
+            <li>• Deskripsi event minimal 10 karakter</li>
+            <li>• Tanggal event tidak boleh di masa lalu</li>
           </ul>
-          <p className="text-sm text-blue-700 space-y-1"><i>Makasih ya kak Gak janji datanya gak bocor kek fufufafa hehe ups-</i></p>
+          <p className="text-sm text-blue-700 mt-2">
+            <i>Pastikan semua informasi event sudah benar sebelum disimpan!</i>
+          </p>
         </div>
       </div>
     </div>
   );
 };
 
-export default AddUserForm;
+export default AddEventForm;
