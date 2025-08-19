@@ -1,143 +1,278 @@
-import React from 'react';
-import Button from './Button';
+import React, { useState } from 'react';
 
-interface User {
-  id?: string;
-  firstName: string;
-  lastName: string;
-  address: string;
-  IdentityNumber: number;
-  birthDate: string;
-  status: boolean;
+interface Event {
+  id?: number;
+  title: string;
+  description: string;
+  date: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-interface UserTableProps {
-  users: User[];
-  onViewDetail: (userId: string) => void;
-  onDeleteUser: (userId: string) => void;
+interface EventTableProps {
+  events: Event[];
+  onViewDetail: (eventId: number) => void;
+  onDeleteEvent: (eventId: number) => void;
+  onEditEvent: (eventId: number, eventData: Event) => void;
   isLoading: boolean;
 }
 
-const UserTable: React.FC<UserTableProps> = ({ 
-  users, 
-  onViewDetail, 
-  onDeleteUser, 
-  isLoading 
+const EventTable: React.FC<EventTableProps> = ({
+  events,
+  onViewDetail,
+  onDeleteEvent,
+  onEditEvent,
+  isLoading
 }) => {
-  return (
-    <div className="overflow-x-auto bg-white shadow-lg rounded-lg">
-      <div className="table w-full">
-        <div className="table-row-group">
-          {}
-          <div className="table-row bg-gray-600">
-            <div className="table-cell text-white px-6 py-4 text-lg font-semibold">Full Name</div>
-            <div className="table-cell text-white px-6 py-4 text-lg font-semibold">Address</div>
-            <div className="table-cell text-white px-6 py-4 text-lg font-semibold">Identity Number</div>
-            <div className="table-cell text-white px-6 py-4 text-lg font-semibold">Birth Date</div>
-            <div className="table-cell text-white px-6 py-4 text-lg font-semibold">Status</div>
-            <div className="table-cell text-white px-6 py-4 text-lg font-semibold">Actions</div>
-          </div>
-          
-          {}
-          {users.length === 0 ? (
-            <EmptyTableRow />
-          ) : (
-            users.map((user, index) => (
-              <UserRow 
-                key={user.id || index}
-                user={user}
-                onViewDetail={onViewDetail}
-                onDeleteUser={onDeleteUser}
-                isLoading={isLoading}
-              />
-            ))
-          )}
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [editFormData, setEditFormData] = useState<Event>({
+    title: '',
+    description: '',
+    date: ''
+  });
+
+  // Handle edit button click
+  const handleEditClick = (event: Event) => {
+    setEditingEventId(event.id || 0);
+    setEditFormData({
+      title: event.title,
+      description: event.description,
+      date: event.date
+    });
+  };
+
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    setEditingEventId(null);
+    setEditFormData({ title: '', description: '', date: '' });
+  };
+
+  // Handle save edit
+  const handleSaveEdit = async (eventId: number) => {
+    try {
+      await onEditEvent(eventId, editFormData);
+      setEditingEventId(null);
+    } catch (error) {
+      console.error('Error updating event:', error);
+    }
+  };
+
+  // Handle input change in edit form
+  const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('id-ID', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  // Check if event is upcoming or past
+  const isUpcoming = (dateString: string) => {
+    const eventDate = new Date(dateString);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return eventDate >= today;
+  };
+
+  if (isLoading && events.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-8">
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-gray-600">Loading events...</span>
         </div>
       </div>
+    );
+  }
+
+  if (events.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-8 text-center">
+        <div className="text-6xl mb-4">📅</div>
+        <h3 className="text-xl font-semibold text-gray-700 mb-2">No Events Found</h3>
+        <p className="text-gray-500">Start by creating your first event!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-200">
+        <h2 className="text-xl font-semibold text-gray-800">
+          Events List ({events.length})
+        </h2>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Title
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Description
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Date
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {events.map((event, index) => (
+              <tr 
+                key={event.id || index} 
+                className="hover:bg-gray-50 transition-colors"
+              >
+                {/* Title */}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {editingEventId === event.id ? (
+                    <input
+                      type="text"
+                      name="title"
+                      value={editFormData.title}
+                      onChange={handleEditInputChange}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                      placeholder="Event title"
+                    />
+                  ) : (
+                    <div className="text-sm font-medium text-gray-900">
+                      {event.title}
+                    </div>
+                  )}
+                </td>
+
+                {/* Description */}
+                <td className="px-6 py-4">
+                  {editingEventId === event.id ? (
+                    <textarea
+                      name="description"
+                      value={editFormData.description}
+                      onChange={handleEditInputChange}
+                      rows={2}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm resize-none"
+                      placeholder="Event description"
+                    />
+                  ) : (
+                    <div className="text-sm text-gray-900 max-w-xs">
+                      {event.description.length > 100 
+                        ? `${event.description.substring(0, 100)}...` 
+                        : event.description
+                      }
+                    </div>
+                  )}
+                </td>
+
+                {/* Date */}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {editingEventId === event.id ? (
+                    <input
+                      type="date"
+                      name="date"
+                      value={editFormData.date}
+                      onChange={handleEditInputChange}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    />
+                  ) : (
+                    <div className="text-sm text-gray-900">
+                      {formatDate(event.date)}
+                    </div>
+                  )}
+                </td>
+
+                {/* Status */}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    isUpcoming(event.date)
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {isUpcoming(event.date) ? '🟢 Upcoming' : '🔘 Past'}
+                  </span>
+                </td>
+
+                {/* Actions */}
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                  {editingEventId === event.id ? (
+                    // Edit mode buttons
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleSaveEdit(event.id!)}
+                        className="text-green-600 hover:text-green-900 px-2 py-1 border border-green-300 rounded text-xs"
+                        disabled={isLoading}
+                      >
+                      Save
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        className="text-gray-600 hover:text-gray-900 px-2 py-1 border border-gray-300 rounded text-xs"
+                      >
+                      Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    // Normal mode buttons
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => onViewDetail(event.id!)}
+                        className="text-blue-600 hover:text-blue-900 px-2 py-1 border border-blue-300 rounded text-xs"
+                        title="View Details"
+                      >
+                      View
+                      </button>
+                      <button
+                        onClick={() => handleEditClick(event)}
+                        className="text-yellow-600 hover:text-yellow-900 px-2 py-1 border border-yellow-300 rounded text-xs"
+                        disabled={isLoading}
+                        title="Edit Event"
+                      >
+                      Edit
+                      </button>
+                      <button
+                        onClick={() => onDeleteEvent(event.id!)}
+                        className="text-red-600 hover:text-red-900 px-2 py-1 border border-red-300 rounded text-xs"
+                        disabled={isLoading}
+                        title="Delete Event"
+                      >
+                      Delete
+                      </button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Loading overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-gray-50 bg-opacity-75 flex items-center justify-center">
+          <div className="flex items-center">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <span className="ml-2 text-gray-600">Processing...</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-const EmptyTableRow: React.FC = () => (
-  <div className="table-row">
-    <div className="table-cell bg-gray-50 text-gray-500 px-6 py-12 text-center border-b">
-      <div className="flex flex-col items-center">
-        <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-        </svg>
-        <p className="text-lg font-medium">No users found</p>
-        <p className="text-sm">Click "Add New User" to create your first user</p>
-      </div>
-    </div>
-    <div className="table-cell bg-gray-50 border-b"></div>
-    <div className="table-cell bg-gray-50 border-b"></div>
-    <div className="table-cell bg-gray-50 border-b"></div>
-    <div className="table-cell bg-gray-50 border-b"></div>
-    <div className="table-cell bg-gray-50 border-b"></div>
-  </div>
-);
-
-interface UserRowProps {
-  user: User;
-  onViewDetail: (userId: string) => void;
-  onDeleteUser: (userId: string) => void;
-  isLoading: boolean;
-}
-
-const UserRow: React.FC<UserRowProps> = ({ user, onViewDetail, onDeleteUser, isLoading }) => (
-  <div className="table-row hover:bg-gray-50 transition-colors">
-    <div className="table-cell bg-white text-gray-800 px-6 py-4 text-md border-b font-medium">
-      {user.firstName} {user.lastName}
-    </div>
-    <div className="table-cell bg-white text-gray-700 px-6 py-4 text-md border-b max-w-xs">
-      <div className="truncate" title={user.address}>
-        {user.address}
-      </div>
-    </div>
-    <div className="table-cell bg-white text-gray-700 px-6 py-4 text-md border-b">
-      {user.IdentityNumber}
-    </div>
-    <div className="table-cell bg-white text-gray-700 px-6 py-4 text-md border-b">
-      {user.birthDate ? new Date(user.birthDate).toLocaleDateString('id-ID') : '-'}
-    </div>
-    <div className="table-cell bg-white text-gray-700 px-6 py-4 text-md border-b">
-      <StatusBadge status={user.status} />
-    </div>
-    <div className="table-cell bg-white text-gray-700 px-6 py-4 text-md border-b">
-      <div className="flex gap-2">
-        <Button
-          variant="success"
-          size="sm"
-          onClick={() => user.id && onViewDetail(user.id)}
-          disabled={isLoading}
-        >
-          View
-        </Button>
-        <Button
-          variant="danger"
-          size="sm"
-          onClick={() => user.id && onDeleteUser(user.id)}
-          disabled={isLoading}
-        >
-          Delete
-        </Button>
-      </div>
-    </div>
-  </div>
-);
-
-interface StatusBadgeProps {
-  status: boolean;
-}
-
-const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => (
-  <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-    status 
-      ? 'bg-green-100 text-green-800 border border-green-200' 
-      : 'bg-red-100 text-red-800 border border-red-200'
-  }`}>
-    {status ? 'Active' : 'Inactive'}
-  </span>
-);
-
-export default UserTable;
+export default EventTable;
