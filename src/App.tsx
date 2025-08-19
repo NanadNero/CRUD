@@ -1,144 +1,229 @@
 import { useState, useEffect } from 'react';
 import './index.css';
-import AddUserForm from './AddUserForm';
 import Button from './component/Button';
-import UserTable from './component/Table';
-import UserStats from './component/User';
 import LoadingIndicator from './component/LoadingIndicator';
-import { userApi } from './service/API';
+import { eventApi } from './service/API';
+import EventStats from './component/User';
+import UserTable from './component/Table';
+import AddUserForm from './AddUserForm';
 
-interface User {
-  id?: string;
-  firstName: string;
-  lastName: string;
-  address: string;
-  IdentityNumber: number;
-  birthDate: string;
-  status: boolean;
+interface Event {
+  id?: number;
+  title: string;
+  description: string;
+  date: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 type CurrentView = 'list' | 'add' | 'detail';
 
 function App() {
-  const [users, setUsers] = useState<User[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [currentView, setCurrentView] = useState<CurrentView>('list');
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-useEffect(() => {
-    loadUsers();
-}, []);
+  useEffect(() => {
+    loadEvents();
+  }, []);
 
-const loadUsers = async () => {
-    try {
-      const data = await userApi.fetchUsers();
-      setUsers(data);
-    } catch (error) {
-      console.error('Failed to load users:', error);
-      alert('Failed to load users!');
-    }
-};
-
-const handleAddUser = () => {
-    setCurrentView('add');
-};
-
-const handleViewDetail = (userId: string) => {
-    setSelectedUserId(userId);
-    setCurrentView('detail');
-};
-
-const handleBackToList = () => {
-    setCurrentView('list');
-    setSelectedUserId(null);
-};
-
-const handleSaveUser = async (userData: User) => {
+  const loadEvents = async () => {
     setIsLoading(true);
     try {
-      await userApi.createUser(userData);
-      await loadUsers();
-      setCurrentView('list');
-      alert('Data user berhasil disimpan!');
+      const response = await eventApi.fetchEvents();
+      // Handle the Laravel API response structure
+      if (response.success && response.data) {
+        setEvents(response.data);
+      } else {
+        setEvents([]);
+      }
     } catch (error) {
-      console.error('Error saving user:', error);
-      alert('Gagal menyimpan data user!');
+      console.error('Failed to load events:', error);
+      alert('Failed to load events!');
+      setEvents([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddEvent = () => {
+    setCurrentView('add');
+  };
+
+  const handleViewDetail = (eventId: number) => {
+    setSelectedEventId(eventId);
+    setCurrentView('detail');
+  };
+
+  const handleBackToList = () => {
+    setCurrentView('list');
+    setSelectedEventId(null);
+  };
+
+  const handleSaveEvent = async (eventData: Event) => {
+    setIsLoading(true);
+    try {
+      const response = await eventApi.createEvent(eventData);
+      if (response.success) {
+        await loadEvents();
+        setCurrentView('list');
+        alert('Event berhasil disimpan!');
+      } else {
+        throw new Error(response.message || 'Failed to save event');
+      }
+    } catch (error) {
+      console.error('Error saving event:', error);
+      alert('Gagal menyimpan event!');
       throw error;
     } finally {
       setIsLoading(false);
     }
-};
+  };
 
-const handleDeleteUser = async (userId: string) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus user ini?')) {
+  const handleDeleteEvent = async (eventId: number) => {
+    if (window.confirm('Apakah Anda yakin ingin menghapus event ini?')) {
       try {
         setIsLoading(true);
-        await userApi.deleteUser(userId);
-        await loadUsers();
-        alert('User berhasil dihapus!');
+        const response = await eventApi.deleteEvent(eventId);
+        if (response.success) {
+          await loadEvents();
+          alert('Event berhasil dihapus!');
+        } else {
+          throw new Error(response.message || 'Failed to delete event');
+        }
       } catch (error) {
-        console.error('Error deleting user:', error);
-        alert('Gagal menghapus user!');
+        console.error('Error deleting event:', error);
+        alert('Gagal menghapus event!');
       } finally {
         setIsLoading(false);
       }
     }
-};
+  };
 
-if (currentView === 'add') {
+  const handleEditEvent = async (eventId: number, eventData: Event) => {
+    setIsLoading(true);
+    try {
+      const response = await eventApi.updateEvent(eventId, eventData);
+      if (response.success) {
+        await loadEvents();
+        alert('Event berhasil diupdate!');
+      } else {
+        throw new Error(response.message || 'Failed to update event');
+      }
+    } catch (error) {
+      console.error('Error updating event:', error);
+      alert('Gagal mengupdate event!');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (currentView === 'add') {
     return (
       <AddUserForm
-        onSave={handleSaveUser}
+        onSave={handleSaveEvent}
         onCancel={handleBackToList}
       />
     );
-}
+  }
 
-if (currentView === 'detail') {
+  if (currentView === 'detail') {
+    const selectedEvent = events.find(event => event.id === selectedEventId);
     return (
       <div className="container mx-auto p-4">
-        <h1>User Detail - {selectedUserId}</h1>
-        <Button 
-          variant="primary"
-          onClick={handleBackToList}
-        >
-          Back to List
-        </Button>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold">Event Detail</h1>
+            <Button
+              variant="primary"
+              onClick={handleBackToList}
+            >
+              ← Back to List
+            </Button>
+          </div>
+          
+          {selectedEvent ? (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Title
+                </label>
+                <p className="text-lg font-semibold">{selectedEvent.title}</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <p className="text-gray-800">{selectedEvent.description}</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date
+                </label>
+                <p className="text-gray-800">
+                  {new Date(selectedEvent.date).toLocaleDateString('id-ID', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </p>
+              </div>
+              
+              {selectedEvent.created_at && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Created At
+                  </label>
+                  <p className="text-sm text-gray-600">
+                    {new Date(selectedEvent.created_at).toLocaleString('id-ID')}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-red-500">Event not found</p>
+          )}
+        </div>
       </div>
     );
-}
+  }
 
-return (
+  return (
     <div className="container mx-auto p-4">
-      {}
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className='font-bold text-3xl text-left'>Users Management</h1>
-        <Button 
+        <h1 className='font-bold text-3xl text-left'>Events Management</h1>
+        <Button
           variant="primary"
           size="lg"
-          onClick={handleAddUser}
+          onClick={handleAddEvent}
           disabled={isLoading}
         >
-          + Add New User
+          + Add New Event
         </Button>
       </div>
 
-      {}
-      <LoadingIndicator 
+      {/* Loading Indicator */}
+      <LoadingIndicator
         show={isLoading}
         message="Memproses data..."
       />
 
-      {}
+      {/* Events Table */}
       <UserTable
-        users={users}
+        events={events}
         onViewDetail={handleViewDetail}
-        onDeleteUser={handleDeleteUser}
+        onDeleteEvent={handleDeleteEvent}
+        onEditEvent={handleEditEvent}
         isLoading={isLoading}
       />
 
-      {}
-      <UserStats users={users} />
+      {/* Events Stats */}
+      <EventStats events={events} />
     </div>
   );
 }
