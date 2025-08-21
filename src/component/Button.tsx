@@ -2,43 +2,55 @@ import React from 'react';
 
 interface ButtonProps {
   children: React.ReactNode;
-  onClick: () => void;
-  variant: 'primary' | 'success' | 'danger';
-  disabled?: boolean;
+  onClick?: () => void;
+  variant?: 'primary' | 'secondary' | 'danger';
   size?: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+  type?: 'button' | 'submit' | 'reset';
   className?: string;
 }
 
-const Button: React.FC<ButtonProps> = ({ 
-  children, 
-  onClick, 
-  variant = 'primary', 
-  disabled = false, 
+const Button: React.FC<ButtonProps> = ({
+  children,
+  onClick,
+  variant = 'primary',
   size = 'md',
-  className = '' 
+  disabled = false,
+  type = 'button',
+  className = ''
 }) => {
-const baseClasses = 'font-medium rounded-md transition-colors shadow-sm';
+  const baseClasses = 'font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2';
   
-const variantClasses = {
-    primary: 'bg-blue-500 hover:bg-blue-600 text-black',
-    success: 'bg-green-500 hover:bg-green-600 text-black',
-    danger: 'bg-red-500 hover:bg-red-600 text-black'
-};
+  const variantClasses = {
+    primary: 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500',
+    secondary: 'bg-gray-600 hover:bg-gray-700 text-white focus:ring-gray-500',
+    danger: 'bg-red-600 hover:bg-red-700 text-white focus:ring-red-500'
+  };
   
-const sizeClasses = {
-    sm: 'px-3 py-2 text-sm',
-    md: 'px-4 py-2 text-md',
-    lg: 'px-6 py-3 text-lg'
-};
+  const sizeClasses = {
+    sm: 'px-3 py-1.5 text-sm',
+    md: 'px-4 py-2 text-sm',
+    lg: 'px-6 py-3 text-base'
+  };
   
-const buttonClasses = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;  
+  const disabledClasses = 'disabled:opacity-50 disabled:cursor-not-allowed';
+  
+  const buttonClasses = `
+    ${baseClasses}
+    ${variantClasses[variant]}
+    ${sizeClasses[size]}
+    ${disabledClasses}
+    ${className}
+  `.trim();
+
   return (
     <button
+      type={type}
       className={buttonClasses}
       onClick={onClick}
       disabled={disabled}
     >
-      {disabled ? 'Loading...' : children}
+      {children}
     </button>
   );
 };
