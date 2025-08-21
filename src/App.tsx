@@ -23,6 +23,7 @@ function App() {
   const [currentView, setCurrentView] = useState<CurrentView>('list');
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadEvents();
@@ -30,17 +31,27 @@ function App() {
 
   const loadEvents = async () => {
     setIsLoading(true);
+    setError(null);
     try {
+      console.log('Loading events...');
       const response = await eventApi.fetchEvents();
+      console.log('API Response:', response);
+      
       // Handle the Laravel API response structure
       if (response.success && response.data) {
-        setEvents(response.data);
+        // Force a complete state reset to ensure re-render
+        setEvents([...response.data]);
+        console.log('Events loaded:', response.data);
       } else {
+        console.warn('No events data or success false:', response);
         setEvents([]);
+        if (!response.success) {
+          setError(response.message || 'Failed to load events');
+        }
       }
     } catch (error) {
       console.error('Failed to load events:', error);
-      alert('Failed to load events!');
+      setError('Failed to load events. Please check your API connection.');
       setEvents([]);
     } finally {
       setIsLoading(false);
@@ -63,9 +74,14 @@ function App() {
 
   const handleSaveEvent = async (eventData: Event) => {
     setIsLoading(true);
+    setError(null);
     try {
+      console.log('Saving event:', eventData);
       const response = await eventApi.createEvent(eventData);
+      console.log('Save response:', response);
+      
       if (response.success) {
+        // Reload events to get the latest data
         await loadEvents();
         setCurrentView('list');
         alert('Event berhasil disimpan!');
@@ -74,6 +90,7 @@ function App() {
       }
     } catch (error) {
       console.error('Error saving event:', error);
+      setError('Gagal menyimpan event!');
       alert('Gagal menyimpan event!');
       throw error;
     } finally {
@@ -83,18 +100,30 @@ function App() {
 
   const handleDeleteEvent = async (eventId: number) => {
     if (window.confirm('Apakah Anda yakin ingin menghapus event ini?')) {
+      setIsLoading(true);
+      setError(null);
       try {
-        setIsLoading(true);
+        console.log('Deleting event:', eventId);
         const response = await eventApi.deleteEvent(eventId);
+        console.log('Delete response:', response);
+        
         if (response.success) {
-          await loadEvents();
+          // Option 1: Optimistic update (faster UI)
+          setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
           alert('Event berhasil dihapus!');
+          
+          // Option 2: Also reload from server to ensure consistency
+          // Uncomment this if you want to be extra sure:
+          // await loadEvents();
         } else {
           throw new Error(response.message || 'Failed to delete event');
         }
       } catch (error) {
         console.error('Error deleting event:', error);
+        setError('Gagal menghapus event!');
         alert('Gagal menghapus event!');
+        // Reload events in case of error to ensure UI consistency
+        await loadEvents();
       } finally {
         setIsLoading(false);
       }
@@ -103,28 +132,72 @@ function App() {
 
   const handleEditEvent = async (eventId: number, eventData: Event) => {
     setIsLoading(true);
+    setError(null);
     try {
+      console.log('Updating event:', eventId, eventData);
       const response = await eventApi.updateEvent(eventId, eventData);
+      console.log('Update response:', response);
+      
       if (response.success) {
-        await loadEvents();
+        // Option 1: Optimistic update (faster UI)
+        setEvents(prevEvents => 
+          prevEvents.map(event => 
+            event.id === eventId 
+              ? { ...event, ...eventData, id: eventId }
+              : event
+          )
+        );
         alert('Event berhasil diupdate!');
+        
+        // Option 2: Also reload from server to ensure consistency
+        // Uncomment this if you want to be extra sure:
+        // await loadEvents();
       } else {
         throw new Error(response.message || 'Failed to update event');
       }
     } catch (error) {
       console.error('Error updating event:', error);
+      setError('Gagal mengupdate event!');
       alert('Gagal mengupdate event!');
+      // Reload events in case of error to ensure UI consistency
+      await loadEvents();
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Show error message if there's an error
+  const ErrorMessage = ({ message }: { message: string }) => (
+    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+      <div className="flex">
+        <div className="text-red-400">
+          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
+        </div>
+        <div className="ml-3">
+          <h3 className="text-sm font-medium text-red-800">Error</h3>
+          <p className="mt-1 text-sm text-red-700">{message}</p>
+          <button 
+            onClick={() => setError(null)} 
+            className="mt-2 text-sm text-red-600 hover:text-red-500"
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   if (currentView === 'add') {
     return (
-      <AddUserForm
-        onSave={handleSaveEvent}
-        onCancel={handleBackToList}
-      />
+      <div>
+        {error && <ErrorMessage message={error} />}
+        <AddUserForm
+          onSave={handleSaveEvent}
+          onCancel={handleBackToList}
+        />
+      </div>
     );
   }
 
@@ -132,13 +205,15 @@ function App() {
     const selectedEvent = events.find(event => event.id === selectedEventId);
     return (
       <div className="container mx-auto p-4">
+        {error && <ErrorMessage message={error} />}
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold">Event Detail</h1>
             <Button
               variant="primary"
               onClick={handleBackToList}
-            >
+              className="text-black-600 hover:text-red-900 px-2 py-1 border border-red-300 rounded text-xs font-medium transition-colors"
+              >
               ← Back to List
             </Button>
           </div>
@@ -202,10 +277,14 @@ function App() {
           size="lg"
           onClick={handleAddEvent}
           disabled={isLoading}
+          className="text-black-500 hover:text-blue-900 px-2 py-1 border border-blue-300 rounded text-xs font-medium transition-colors"
         >
           + Add New Event
         </Button>
       </div>
+
+      {/* Error Message */}
+      {error && <ErrorMessage message={error} />}
 
       {/* Loading Indicator */}
       <LoadingIndicator

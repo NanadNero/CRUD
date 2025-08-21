@@ -30,36 +30,101 @@ const EventTable: React.FC<EventTableProps> = ({
     description: '',
     date: ''
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Handle edit button click
   const handleEditClick = (event: Event) => {
+    console.log('Starting edit for event:', event);
     setEditingEventId(event.id || 0);
+    
+    // Format date for input field (YYYY-MM-DD)
+    let formattedDate = event.date;
+    if (event.date) {
+      const date = new Date(event.date);
+      if (!isNaN(date.getTime())) {
+        formattedDate = date.toISOString().split('T')[0];
+      }
+    }
+    
     setEditFormData({
       title: event.title,
       description: event.description,
-      date: event.date
+      date: formattedDate
+    });
+    
+    console.log('Edit form data set to:', {
+      title: event.title,
+      description: event.description,
+      date: formattedDate
     });
   };
 
   // Handle cancel edit
   const handleCancelEdit = () => {
+    console.log('Cancelling edit');
     setEditingEventId(null);
     setEditFormData({ title: '', description: '', date: '' });
   };
 
   // Handle save edit
   const handleSaveEdit = async (eventId: number) => {
+    console.log('Saving edit for event ID:', eventId);
+    console.log('Edit form data:', editFormData);
+    
+    // Validation
+    if (!editFormData.title.trim()) {
+      alert('Title is required');
+      return;
+    }
+    
+    if (!editFormData.description.trim()) {
+      alert('Description is required');
+      return;
+    }
+    
+    if (!editFormData.date) {
+      alert('Date is required');
+      return;
+    }
+    
+    setIsSubmitting(true);
     try {
       await onEditEvent(eventId, editFormData);
+      console.log('Edit saved successfully');
       setEditingEventId(null);
+      setEditFormData({ title: '', description: '', date: '' });
     } catch (error) {
-      console.error('Error updating event:', error);
+      console.error('Error saving edit:', error);
+      alert('Failed to save changes. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle delete with better confirmation
+  const handleDeleteClick = async (event: Event) => {
+    console.log('Delete clicked for event:', event);
+    
+    if (!event.id) {
+      console.error('Cannot delete event without ID');
+      alert('Cannot delete event: Invalid event ID');
+      return;
+    }
+    
+    const confirmMessage = `Are you sure you want to delete "${event.title}"?\n\nThis action cannot be undone.`;
+    
+    if (window.confirm(confirmMessage)) {
+      console.log('Delete confirmed for event ID:', event.id);
+      onDeleteEvent(event.id);
+    } else {
+      console.log('Delete cancelled');
     }
   };
 
   // Handle input change in edit form
   const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    console.log(`Edit field changed: ${name} = ${value}`);
     setEditFormData(prev => ({
       ...prev,
       [name]: value
@@ -68,21 +133,34 @@ const EventTable: React.FC<EventTableProps> = ({
 
   // Format date for display
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      return date.toLocaleDateString('id-ID', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return 'Invalid Date';
+    }
   };
 
   // Check if event is upcoming or past
   const isUpcoming = (dateString: string) => {
-    const eventDate = new Date(dateString);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return eventDate >= today;
+    try {
+      const eventDate = new Date(dateString);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return eventDate >= today;
+    } catch (error) {
+      console.error('Error checking if upcoming:', dateString, error);
+      return false;
+    }
   };
 
   if (isLoading && events.length === 0) {
@@ -106,8 +184,10 @@ const EventTable: React.FC<EventTableProps> = ({
     );
   }
 
+  console.log('Rendering table with events:', events);
+
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+    <div className="bg-white rounded-lg shadow-md overflow-hidden relative">
       <div className="px-6 py-4 border-b border-gray-200">
         <h2 className="text-xl font-semibold text-gray-800">
           Events List ({events.length})
@@ -118,6 +198,9 @@ const EventTable: React.FC<EventTableProps> = ({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                ID
+              </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Title
               </th>
@@ -141,6 +224,11 @@ const EventTable: React.FC<EventTableProps> = ({
                 key={event.id || index} 
                 className="hover:bg-gray-50 transition-colors"
               >
+                {/* ID */}
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {event.id || 'N/A'}
+                </td>
+
                 {/* Title */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   {editingEventId === event.id ? (
@@ -149,8 +237,9 @@ const EventTable: React.FC<EventTableProps> = ({
                       name="title"
                       value={editFormData.title}
                       onChange={handleEditInputChange}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="Event title"
+                      disabled={isSubmitting}
                     />
                   ) : (
                     <div className="text-sm font-medium text-gray-900">
@@ -167,12 +256,13 @@ const EventTable: React.FC<EventTableProps> = ({
                       value={editFormData.description}
                       onChange={handleEditInputChange}
                       rows={2}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm resize-none"
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="Event description"
+                      disabled={isSubmitting}
                     />
                   ) : (
                     <div className="text-sm text-gray-900 max-w-xs">
-                      {event.description.length > 100 
+                      {event.description && event.description.length > 100 
                         ? `${event.description.substring(0, 100)}...` 
                         : event.description
                       }
@@ -188,7 +278,8 @@ const EventTable: React.FC<EventTableProps> = ({
                       name="date"
                       value={editFormData.date}
                       onChange={handleEditInputChange}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      disabled={isSubmitting}
                     />
                   ) : (
                     <div className="text-sm text-gray-900">
@@ -215,16 +306,17 @@ const EventTable: React.FC<EventTableProps> = ({
                     <div className="flex space-x-2">
                       <button
                         onClick={() => handleSaveEdit(event.id!)}
-                        className="text-green-600 hover:text-green-900 px-2 py-1 border border-green-300 rounded text-xs"
-                        disabled={isLoading}
+                        className="text-green-600 hover:text-green-900 px-3 py-1 border border-green-300 rounded text-xs font-medium transition-colors disabled:opacity-50"
+                        disabled={isSubmitting || isLoading}
                       >
-                      Save
+                        {isSubmitting ? 'Saving...' : 'Save'}
                       </button>
                       <button
                         onClick={handleCancelEdit}
-                        className="text-gray-600 hover:text-gray-900 px-2 py-1 border border-gray-300 rounded text-xs"
+                        className="text-gray-600 hover:text-gray-900 px-3 py-1 border border-gray-300 rounded text-xs font-medium transition-colors"
+                        disabled={isSubmitting}
                       >
-                      Cancel
+                        Cancel
                       </button>
                     </div>
                   ) : (
@@ -232,26 +324,27 @@ const EventTable: React.FC<EventTableProps> = ({
                     <div className="flex space-x-2">
                       <button
                         onClick={() => onViewDetail(event.id!)}
-                        className="text-blue-600 hover:text-blue-900 px-2 py-1 border border-blue-300 rounded text-xs"
+                        className="text-blue-600 hover:text-blue-900 px-2 py-1 border border-blue-300 rounded text-xs font-medium transition-colors"
                         title="View Details"
+                        disabled={isLoading || !event.id}
                       >
-                      View
+                        View
                       </button>
                       <button
                         onClick={() => handleEditClick(event)}
-                        className="text-yellow-600 hover:text-yellow-900 px-2 py-1 border border-yellow-300 rounded text-xs"
-                        disabled={isLoading}
+                        className="text-yellow-600 hover:text-yellow-900 px-2 py-1 border border-yellow-300 rounded text-xs font-medium transition-colors"
+                        disabled={isLoading || !event.id}
                         title="Edit Event"
                       >
-                      Edit
+                       Edit
                       </button>
                       <button
-                        onClick={() => onDeleteEvent(event.id!)}
-                        className="text-red-600 hover:text-red-900 px-2 py-1 border border-red-300 rounded text-xs"
-                        disabled={isLoading}
+                        onClick={() => handleDeleteClick(event)}
+                        className="text-red-600 hover:text-red-900 px-2 py-1 border border-red-300 rounded text-xs font-medium transition-colors"
+                        disabled={isLoading || !event.id}
                         title="Delete Event"
                       >
-                      Delete
+                        Delete
                       </button>
                     </div>
                   )}
@@ -264,8 +357,8 @@ const EventTable: React.FC<EventTableProps> = ({
 
       {/* Loading overlay */}
       {isLoading && (
-        <div className="absolute inset-0 bg-gray-50 bg-opacity-75 flex items-center justify-center">
-          <div className="flex items-center">
+        <div className="absolute inset-0 bg-gray-50 bg-opacity-75 flex items-center justify-center z-10">
+          <div className="flex items-center bg-white rounded-lg px-4 py-2 shadow-lg">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
             <span className="ml-2 text-gray-600">Processing...</span>
           </div>
